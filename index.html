@@ -2,96 +2,207 @@
 <html>
 <head>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Trading Lab</title>
+<title>Trading Lab PRO</title>
 
 <style>
-body {
-  background:#0d0d0d;
-  color:white;
-  text-align:center;
+body{
+  background:#0b0f1a;
+  color:#fff;
   font-family:Arial;
+  text-align:center;
 }
-button {
-  padding:15px;
-  margin:5px;
+
+.card{
+  background:#111827;
+  margin:15px;
+  padding:20px;
+  border-radius:20px;
+  box-shadow:0 0 20px rgba(0,0,0,0.5);
+}
+
+h2{
+  margin-top:20px;
+}
+
+button{
+  padding:14px;
+  margin:6px;
   border:none;
-  border-radius:10px;
-  font-size:16px;
+  border-radius:12px;
+  font-size:15px;
 }
-.win {background:#16a34a}
-.loss {background:#dc2626}
-.reset {background:#444}
-.box {
-  margin:10px;
-  padding:15px;
-  background:#111;
-  border-radius:15px;
+
+.win{background:#16a34a}
+.loss{background:#dc2626}
+.reset{background:#374151}
+
+table{
+  width:100%;
+  margin-top:10px;
+  border-collapse:collapse;
 }
+
+td{
+  border-bottom:1px solid #222;
+  padding:6px;
+  font-size:12px;
+}
+
+.green{color:#22c55e}
+.red{color:#ef4444}
 </style>
 </head>
 
 <body>
 
-<h2>🚀 Trading Lab</h2>
+<h2>🚀 Trading Lab PRO</h2>
 
-<div class="box">
+<div class="card">
 <p id="balance"></p>
 <p id="profit"></p>
 <p id="stats"></p>
 <p id="winrate"></p>
+<p id="status"></p>
+<p id="advice"></p>
 </div>
 
 <button class="win" onclick="trade('W')">WIN</button>
 <button class="loss" onclick="trade('L')">LOSS</button>
 <button class="reset" onclick="reset()">RESET</button>
 
+<div class="card">
+<canvas id="chart" height="150"></canvas>
+</div>
+
+<div class="card">
+<table id="log"></table>
+</div>
+
 <script>
 
-let data = JSON.parse(localStorage.getItem("app_data")) || {
+// ===== DATA =====
+let data = JSON.parse(localStorage.getItem("pro_data")) || {
   balance:1500,
   start:1500,
   wins:0,
   loss:0,
-  step:0
+  step:0,
+  trades:[]
 }
 
+// ===== MARTINGALE =====
 function entry(){
   return data.step==0?12:data.step==1?18:24
 }
 
+// ===== SAVE =====
 function save(){
-  localStorage.setItem("app_data", JSON.stringify(data))
+  localStorage.setItem("pro_data", JSON.stringify(data))
 }
 
+// ===== UPDATE =====
 function update(){
+
   let total = data.wins + data.loss
   let wr = total>0 ? ((data.wins/total)*100).toFixed(1) : 0
+  let pnl = (data.balance - data.start).toFixed(2)
 
-  document.getElementById("balance").innerText = "Balance: "+data.balance
-  document.getElementById("profit").innerText = "Profit: "+(data.balance-data.start)
-  document.getElementById("stats").innerText = "Wins: "+data.wins+" | Loss: "+data.loss
-  document.getElementById("winrate").innerText = "WinRate: "+wr+"%"
+  document.getElementById("balance").innerHTML =
+    "💰 Balance: <b>"+data.balance.toFixed(2)+"</b>"
+
+  document.getElementById("profit").innerHTML =
+    "📈 Profit: <span class='"+(pnl>=0?"green":"red")+"'>"+pnl+"</span>"
+
+  document.getElementById("stats").innerText =
+    "Wins: "+data.wins+" | Loss: "+data.loss
+
+  document.getElementById("winrate").innerText =
+    "WinRate: "+wr+"%"
+
+  let status="GO ✅"
+  let advice="استمر 👍"
+
+  if(pnl <= -30){
+    status="STOP 🚫"
+    advice="وقف فورًا"
+  }
+  else if(wr < 50 && total>5){
+    advice="⚠️ دخولك ضعيف"
+  }
+
+  document.getElementById("status").innerText="Status: "+status
+  document.getElementById("advice").innerText=advice
+
+  // ===== TABLE =====
+  let log = document.getElementById("log")
+  log.innerHTML="<tr><td>#</td><td>R</td><td>$</td><td>P</td></tr>"
+
+  data.trades.slice(-10).forEach((t,i)=>{
+    log.innerHTML +=
+    "<tr><td>"+(i+1)+"</td><td>"+t.r+"</td><td>"+t.e+"</td><td>"+t.p+"</td></tr>"
+  })
+
+  drawChart()
 }
 
+// ===== CHART =====
+function drawChart(){
+  let c = document.getElementById("chart")
+  let ctx = c.getContext("2d")
+
+  ctx.clearRect(0,0,c.width,c.height)
+
+  ctx.strokeStyle="#22c55e"
+  ctx.beginPath()
+
+  let bal=data.start
+  let stepTemp=0
+
+  data.trades.forEach((t,i)=>{
+    let e=stepTemp==0?12:stepTemp==1?18:24
+
+    if(t.r=="W"){bal+=e*0.8;stepTemp=0}
+    else{bal-=e;stepTemp++}
+
+    let x=i*(c.width/(data.trades.length||1))
+    let y=c.height-(bal-1400)
+
+    if(i==0) ctx.moveTo(x,y)
+    else ctx.lineTo(x,y)
+  })
+
+  ctx.stroke()
+}
+
+// ===== TRADE =====
 function trade(type){
+
+  let grade = prompt("التقييم A / B / C","A") || "A"
+
   let e = entry()
+  let p = 0
 
   if(type=="W"){
-    data.balance += e*0.8
+    p = e*0.8
+    data.balance = Number((data.balance + p).toFixed(2))
     data.wins++
-    data.step=0
+    data.step = 0
   } else {
-    data.balance -= e
+    p = -e
+    data.balance = Number((data.balance - e).toFixed(2))
     data.loss++
     data.step++
   }
+
+  data.trades.push({r:type,e:e,p:p,g:grade})
 
   save()
   update()
 }
 
+// ===== RESET =====
 function reset(){
-  data = {balance:1500,start:1500,wins:0,loss:0,step:0}
+  data = {balance:1500,start:1500,wins:0,loss:0,step:0,trades:[]}
   save()
   update()
 }
