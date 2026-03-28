@@ -19,7 +19,7 @@ td{font-size:12px;padding:5px;border-bottom:1px solid #222}
 
 <body>
 
-<h2>🚀 Trading Lab PRO SAFE</h2>
+<h2>🚀 Trading Lab AUTO PRO</h2>
 
 <div class="card">
 <p id="balance"></p>
@@ -41,30 +41,33 @@ td{font-size:12px;padding:5px;border-bottom:1px solid #222}
 <script>
 
 // ===== DATA =====
-let data = JSON.parse(localStorage.getItem("safe")) || {
+let data = JSON.parse(localStorage.getItem("auto_pro")) || {
   balance:1500,
   start:1500,
   wins:0,
   loss:0,
-  entry:12,
+  step:0,
   payout:0.8,
-  winIncrease:0.2,
-  lossIncrease:0.5,
   trades:[],
+  compoundRate:0.02, // 🔥 نسبة الزيادة
 
-  // 🔥 حماية
   maxEntry:100,
   stopLoss:-50,
   target:100,
   maxStreak:3
 }
 
-// ===== SAVE =====
-function save(){
-  localStorage.setItem("safe",JSON.stringify(data))
+// ===== ENTRY =====
+function entry(){
+  return data.step==0?12:data.step==1?18:24
 }
 
-// ===== ANALYSIS =====
+// ===== SAVE =====
+function save(){
+  localStorage.setItem("auto_pro",JSON.stringify(data))
+}
+
+// ===== STREAK =====
 function losingStreak(){
 let s=0
 for(let i=data.trades.length-1;i>=0;i--){
@@ -89,7 +92,7 @@ document.getElementById("stats").innerText=
 "Trades: "+total+" | Win: "+data.wins+" | Loss: "+data.loss
 
 document.getElementById("next").innerText=
-"Next Entry: "+data.entry.toFixed(2)+"$"
+"Next Entry: "+entry()+"$"
 
 let status="GO ✅"
 
@@ -99,7 +102,7 @@ if(losingStreak()>=data.maxStreak) status="STREAK STOP ⚠️"
 
 document.getElementById("status").innerText=status
 
-// ===== LOG =====
+// LOG
 let log=document.getElementById("log")
 log.innerHTML="<tr><td>#</td><td>R</td><td>$</td><td>P</td></tr>"
 
@@ -110,7 +113,7 @@ log.innerHTML+=
 
 }
 
-// ===== CHECK STOP =====
+// ===== BLOCK =====
 function blocked(){
 let pnl=data.balance-data.start
 return (
@@ -124,28 +127,31 @@ losingStreak()>=data.maxStreak
 function trade(type){
 
 if(blocked()){
-alert("🚫 التداول موقوف بسبب الحماية")
+alert("🚫 التداول موقوف")
 return
 }
 
-let e=data.entry
+let e=entry()
 let p=0
 
 if(type=="W"){
 p=e*data.payout
 data.balance=Number((data.balance+p).toFixed(2))
 data.wins++
-data.entry = e + (e*data.winIncrease)
+data.step=0
+
+// 🔥 زيادة رأس المال
+data.start = Number((data.start + (data.start * data.compoundRate)).toFixed(2))
+
 }else{
 p=-e
 data.balance=Number((data.balance-e).toFixed(2))
 data.loss++
-data.entry = e + (e*data.lossIncrease)
+data.step++
 }
 
-// 🔥 حد أقصى
-if(data.entry > data.maxEntry){
-data.entry = data.maxEntry
+if(entry()>data.maxEntry){
+data.step=0
 }
 
 data.trades.push({r:type,e:e,p:p})
@@ -159,19 +165,14 @@ function settings(){
 
 let b=prompt("رأس المال",data.balance)
 let p=prompt("نسبة الربح",data.payout)
-let w=prompt("زيادة بعد الربح",data.winIncrease)
-let l=prompt("زيادة بعد الخسارة",data.lossIncrease)
-
-// حماية
+let c=prompt("نسبة زيادة رأس المال (0.02)",data.compoundRate)
 let m=prompt("أقصى دخول",data.maxEntry)
 let s=prompt("وقف الخسارة",data.stopLoss)
 let t=prompt("الهدف",data.target)
 
 if(b){data.balance=Number(b);data.start=Number(b)}
 if(p){data.payout=Number(p)}
-if(w){data.winIncrease=Number(w)}
-if(l){data.lossIncrease=Number(l)}
-
+if(c){data.compoundRate=Number(c)}
 if(m){data.maxEntry=Number(m)}
 if(s){data.stopLoss=Number(s)}
 if(t){data.target=Number(t)}
@@ -182,7 +183,7 @@ update()
 
 // ===== RESET =====
 function reset(){
-localStorage.removeItem("safe")
+localStorage.removeItem("auto_pro")
 location.reload()
 }
 
