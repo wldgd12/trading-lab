@@ -4,14 +4,13 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
 <style>
-body{background:#05070f;color:#fff;text-align:center;font-family:Arial}
+body{background:#020617;color:#fff;font-family:Arial;text-align:center}
 .card{background:#0f172a;margin:12px;padding:18px;border-radius:18px}
 button{padding:12px;margin:4px;border:none;border-radius:10px}
 .win{background:#22c55e}
 .loss{background:#ef4444}
-.reset{background:#374151}
-.settings{background:#2563eb}
-td{font-size:12px;padding:5px;border-bottom:1px solid #222}
+.settings{background:#3b82f6}
+td{font-size:12px;padding:5px;border-bottom:1px solid #1e293b}
 .green{color:#22c55e}
 .red{color:#ef4444}
 </style>
@@ -19,95 +18,100 @@ td{font-size:12px;padding:5px;border-bottom:1px solid #222}
 
 <body>
 
-<h2>🧠 Trading Lab AI</h2>
+<h2>🧠 Trading Lab PRO ANALYTICS</h2>
 
 <div class="card">
 <p id="balance"></p>
 <p id="profit"></p>
 <p id="winrate"></p>
+<p id="grade"></p>
 <p id="status"></p>
-<p id="goal"></p>
 <p id="advice"></p>
-<p id="ai"></p>
 </div>
 
 <button class="win" onclick="trade('W')">WIN</button>
 <button class="loss" onclick="trade('L')">LOSS</button>
-<button class="reset" onclick="reset()">RESET</button>
 <button class="settings" onclick="settings()">⚙️</button>
+
+<div class="card">
+<p id="stats"></p>
+<p id="streak"></p>
+<p id="avg"></p>
+</div>
 
 <div class="card">
 <canvas id="chart" height="150"></canvas>
 </div>
 
-<div class="card">
-<table id="log"></table>
-</div>
-
 <script>
 
-let data = JSON.parse(localStorage.getItem("ai_lab")) || {
-  balance:1500,start:1500,wins:0,loss:0,step:0,
-  trades:[],goal:50,stop:-30
+let data = JSON.parse(localStorage.getItem("analytics")) || {
+balance:1500,start:1500,wins:0,loss:0,step:0,trades:[],payout:0.8
 }
 
 function entry(){
-  return data.step==0?12:data.step==1?18:24
+return data.step==0?12:data.step==1?18:24
 }
 
 function save(){
-  localStorage.setItem("ai_lab",JSON.stringify(data))
+localStorage.setItem("analytics",JSON.stringify(data))
 }
 
-// ===== AI =====
+// ===== ANALYSIS =====
 function analyze(){
 
-let last = data.trades.slice(-10)
+let total=data.wins+data.loss
+let wr=total>0?(data.wins/total)*100:0
 
-let wins = last.filter(t=>t.r=="W").length
-let losses = last.filter(t=>t.r=="L").length
+let last=data.trades.slice(-10)
 
-let streak = 0
+let wins=last.filter(t=>t.r=="W").length
+let losses=last.filter(t=>t.r=="L").length
+
+let streak=0
 for(let i=data.trades.length-1;i>=0;i--){
 if(data.trades[i].r=="L") streak++
 else break
 }
 
-let result="🔥 ممتاز"
-if(losses>wins) result="⚠️ أدائك ضعيف"
-if(streak>=3) result="🚨 وقف فورًا - خسائر متتالية"
+let grade="A 🔥"
+if(wr<70) grade="B 👍"
+if(wr<50) grade="C ⚠️"
 
-return result
+let advice="استمر"
+if(streak>=3) advice="🚨 وقف فورًا"
+else if(wr<50) advice="خفف تداول"
+
+return {wr,grade,advice,streak}
 }
 
 // ===== UPDATE =====
 function update(){
 
-let total=data.wins+data.loss
-let wr=total>0?((data.wins/total)*100).toFixed(1):0
-let pnl=(data.balance-data.start)
+let a=analyze()
+let pnl=data.balance-data.start
 
 document.getElementById("balance").innerText="💰 "+data.balance.toFixed(2)
-document.getElementById("profit").innerText="📈 "+pnl.toFixed(2)
-document.getElementById("winrate").innerText="WinRate: "+wr+"%"
+document.getElementById("profit").innerHTML="📈 <span class='"+(pnl>=0?"green":"red")+"'>"+pnl.toFixed(2)+"</span>"
+document.getElementById("winrate").innerText="WinRate: "+a.wr.toFixed(1)+"%"
+document.getElementById("grade").innerText="Grade: "+a.grade
+document.getElementById("status").innerText=(pnl<0?"⚠️ ضغط":"🔥 ممتاز")
+document.getElementById("advice").innerText=a.advice
 
-let status="GO ✅"
-if(pnl<=data.stop) status="STOP 🚫"
-if(pnl>=data.goal) status="TARGET 🎯"
+// ===== STATS =====
+let avg = data.trades.length>0 ? 
+(data.trades.reduce((s,t)=>s+t.p,0)/data.trades.length).toFixed(2) : 0
 
-document.getElementById("status").innerText=status
-document.getElementById("goal").innerText="Goal: "+data.goal+" | Stop: "+data.stop
-document.getElementById("advice").innerText="استمر 👍"
-document.getElementById("ai").innerText=analyze()
+document.getElementById("stats").innerText=
+"Trades: "+(data.wins+data.loss)
 
-// جدول
-let log=document.getElementById("log")
-log.innerHTML="<tr><td>#</td><td>R</td><td>$</td><td>P</td></tr>"
-data.trades.slice(-10).forEach((t,i)=>{
-log.innerHTML+="<tr><td>"+(i+1)+"</td><td>"+t.r+"</td><td>"+t.e+"</td><td>"+t.p+"</td></tr>"
-})
+document.getElementById("streak").innerText=
+"Losing Streak: "+a.streak
 
-// رسم
+document.getElementById("avg").innerText=
+"Avg P/L: "+avg
+
+// ===== CHART =====
 let c=document.getElementById("chart")
 let ctx=c.getContext("2d")
 ctx.clearRect(0,0,c.width,c.height)
@@ -121,7 +125,7 @@ let stepTemp=0
 data.trades.forEach((t,i)=>{
 let e=stepTemp==0?12:stepTemp==1?18:24
 
-if(t.r=="W"){bal+=e*0.8;stepTemp=0}
+if(t.r=="W"){bal+=e*data.payout;stepTemp=0}
 else{bal-=e;stepTemp++}
 
 let x=i*(c.width/(data.trades.length||1))
@@ -132,17 +136,16 @@ else ctx.lineTo(x,y)
 })
 
 ctx.stroke()
-
 }
 
-// ===== ACTION =====
+// ===== TRADE =====
 function trade(type){
 
 let e=entry()
 let p=0
 
 if(type=="W"){
-p=e*0.8
+p=e*data.payout
 data.balance=Number((data.balance+p).toFixed(2))
 data.wins++
 data.step=0
@@ -160,21 +163,8 @@ update()
 }
 
 function settings(){
-
-let b=prompt("رأس المال",data.balance)
-let g=prompt("الهدف",data.goal)
-let s=prompt("وقف الخسارة",data.stop)
-
-if(b){data.balance=Number(b);data.start=Number(b)}
-if(g){data.goal=Number(g)}
-if(s){data.stop=Number(s)}
-
-save()
-update()
-}
-
-function reset(){
-data={balance:1500,start:1500,wins:0,loss:0,step:0,trades:[],goal:50,stop:-30}
+let pay=prompt("Payout (0.8)",data.payout)
+if(pay){data.payout=Number(pay)}
 save()
 update()
 }
