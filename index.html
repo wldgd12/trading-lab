@@ -8,50 +8,23 @@ body{margin:0;font-family:Arial;background:#0c111b;color:white}
 .container{display:flex;height:100vh}
 
 /* LEFT */
-.left{
-width:60%;
-background:#1f2937;
-padding:10px;
-overflow:auto;
-}
-
+.left{width:60%;background:#1f2937;padding:10px;overflow:auto}
 table{width:100%;border-collapse:collapse}
 th,td{padding:8px;border-bottom:1px solid #333;text-align:center;font-size:13px}
-
 .win{background:#22c55e;color:black}
 .loss{background:#ef4444;color:white}
 
 /* RIGHT */
-.right{
-width:40%;
-background:#111827;
-padding:10px;
-}
+.right{width:40%;background:#111827;padding:10px}
 
-.box{
-background:#16a34a;
-color:black;
-padding:10px;
-border-radius:10px;
-margin-bottom:10px;
-}
+.box{background:#16a34a;color:black;padding:10px;border-radius:10px;margin-bottom:10px}
+.dark{background:#020617;color:white}
 
-.box.dark{
-background:#020617;
-color:white;
-}
-
-button{
-padding:10px;
-margin:5px;
-border:none;
-border-radius:8px;
-font-weight:bold;
-}
-
+button{padding:10px;margin:5px;border:none;border-radius:8px;font-weight:bold}
 .winBtn{background:#22c55e}
 .lossBtn{background:#ef4444}
 .resetBtn{background:#374151;color:white}
+.settingsBtn{background:#3b82f6;color:white}
 
 </style>
 </head>
@@ -60,20 +33,14 @@ font-weight:bold;
 
 <div class="container">
 
-<!-- LEFT TABLE -->
+<!-- TABLE -->
 <div class="left">
 <table id="log">
-<tr>
-<th>#</th>
-<th>R</th>
-<th>Entry</th>
-<th>P/L</th>
-<th>Balance</th>
-</tr>
+<tr><th>#</th><th>R</th><th>Entry</th><th>P/L</th><th>Balance</th></tr>
 </table>
 </div>
 
-<!-- RIGHT PANEL -->
+<!-- PANEL -->
 <div class="right">
 
 <div class="box">
@@ -86,9 +53,9 @@ font-weight:bold;
 <div class="box dark">
 <p id="final"></p>
 <p id="gain"></p>
-<p id="winProfit"></p>
+<p id="profit"></p>
 <p id="stop"></p>
-<p id="maxLoss"></p>
+<p id="limit"></p>
 </div>
 
 <div class="box dark">
@@ -98,6 +65,7 @@ font-weight:bold;
 
 <button class="winBtn" onclick="trade('W')">WIN</button>
 <button class="lossBtn" onclick="trade('L')">LOSS</button>
+<button class="settingsBtn" onclick="settings()">⚙️</button>
 <button class="resetBtn" onclick="reset()">RESET</button>
 
 </div>
@@ -106,7 +74,7 @@ font-weight:bold;
 
 <script>
 
-let data = JSON.parse(localStorage.getItem("pro_full")) || {
+let data = JSON.parse(localStorage.getItem("vip")) || {
 balance:1500,
 start:1500,
 initialStart:1500,
@@ -114,22 +82,34 @@ wins:0,
 loss:0,
 step:0,
 payout:0.92,
-trades:[],
+target:100,
 stopLoss:-50,
-target:100
+maxLoss:3,
+trades:[]
 }
 
-// ENTRY
 function entry(){
 return data.step==0?12:data.step==1?18:24
 }
 
-// SAVE
 function save(){
-localStorage.setItem("pro_full",JSON.stringify(data))
+localStorage.setItem("vip",JSON.stringify(data))
 }
 
-// UPDATE
+function streak(){
+let s=0
+for(let i=data.trades.length-1;i>=0;i--){
+if(data.trades[i].r=="L") s++
+else break
+}
+return s
+}
+
+function blocked(){
+let pnl=data.balance-data.initialStart
+return pnl<=data.stopLoss || pnl>=data.target || streak()>=data.maxLoss
+}
+
 function update(){
 
 let total=data.wins+data.loss
@@ -142,23 +122,23 @@ document.getElementById("wr").innerText="WinRate: "+wr+"%"
 document.getElementById("payout").innerText="Payout: "+(data.payout*100)+"%"
 
 document.getElementById("final").innerText="Capital Final: "+data.balance.toFixed(2)
-document.getElementById("gain").innerText="Account Gain: "+((pnl/data.initialStart)*100).toFixed(2)+"%"
-document.getElementById("winProfit").innerText="Profit: "+pnl.toFixed(2)
+document.getElementById("gain").innerText="Gain: "+((pnl/data.initialStart)*100).toFixed(2)+"%"
+document.getElementById("profit").innerText="Profit: "+pnl.toFixed(2)
 document.getElementById("stop").innerText="Stop Loss: "+data.stopLoss
-document.getElementById("maxLoss").innerText="Max Loss Limit: 3"
+document.getElementById("limit").innerText="Max Loss: "+data.maxLoss
 
 document.getElementById("next").innerText="Next Entry: "+entry()
 
 let status="GO"
-if(pnl<=data.stopLoss) status="STOP"
-if(pnl>=data.target) status="TARGET"
+if(pnl<=data.stopLoss) status="STOP LOSS"
+if(pnl>=data.target) status="TARGET HIT"
+if(streak()>=data.maxLoss) status="STREAK STOP"
 
 document.getElementById("status").innerText="Status: "+status
 
 // TABLE
 let log=document.getElementById("log")
-log.innerHTML=`
-<tr><th>#</th><th>R</th><th>Entry</th><th>P/L</th><th>Balance</th></tr>`
+log.innerHTML=`<tr><th>#</th><th>R</th><th>Entry</th><th>P/L</th><th>Balance</th></tr>`
 
 data.trades.forEach((t,i)=>{
 log.innerHTML+=`
@@ -173,8 +153,12 @@ log.innerHTML+=`
 
 }
 
-// TRADE
 function trade(type){
+
+if(blocked()){
+alert("🚫 Trading Stopped")
+return
+}
 
 let e=entry()
 let p=0
@@ -191,17 +175,36 @@ data.loss++
 data.step++
 }
 
-data.trades.push({
-r:type,e:e,p:p,b:data.balance
-})
+data.trades.push({r:type,e:e,p:p,b:data.balance})
 
 save()
 update()
 }
 
-// RESET
+function settings(){
+
+let b=prompt("Capital",data.balance)
+let p=prompt("Payout (0.92)",data.payout)
+let t=prompt("Target Profit",data.target)
+let s=prompt("Stop Loss",data.stopLoss)
+let m=prompt("Max Losing Streak",data.maxLoss)
+
+if(b){
+data.balance=Number(b)
+data.start=Number(b)
+data.initialStart=Number(b)
+}
+if(p){data.payout=Number(p)}
+if(t){data.target=Number(t)}
+if(s){data.stopLoss=Number(s)}
+if(m){data.maxLoss=Number(m)}
+
+save()
+update()
+}
+
 function reset(){
-localStorage.removeItem("pro_full")
+localStorage.removeItem("vip")
 location.reload()
 }
 
