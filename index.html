@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Trading Lab</title>
+
+<style>
+body {
+  background:#0d0d0d;
+  color:white;
+  text-align:center;
+  font-family:Arial;
+}
+button {
+  padding:15px;
+  margin:5px;
+  border:none;
+  border-radius:10px;
+  font-size:16px;
+}
+.win {background:#16a34a}
+.loss {background:#dc2626}
+.reset {background:#444}
+.box {
+  margin:10px;
+  padding:15px;
+  background:#111;
+  border-radius:15px;
+}
+</style>
+</head>
+
+<body>
+
+<h2>🚀 Trading Lab</h2>
+
+<div class="box">
+<p id="balance"></p>
+<p id="profit"></p>
+<p id="stats"></p>
+<p id="winrate"></p>
+</div>
+
+<button class="win" onclick="trade('W')">WIN</button>
+<button class="loss" onclick="trade('L')">LOSS</button>
+<button class="reset" onclick="reset()">RESET</button>
+
+<script>
+
+let data = JSON.parse(localStorage.getItem("app_data")) || {
+  balance:1500,
+  start:1500,
+  wins:0,
+  loss:0,
+  step:0
+}
+
+function entry(){
+  return data.step==0?12:data.step==1?18:24
+}
+
+function save(){
+  localStorage.setItem("app_data", JSON.stringify(data))
+}
+
+function update(){
+  let total = data.wins + data.loss
+  let wr = total>0 ? ((data.wins/total)*100).toFixed(1) : 0
+
+  document.getElementById("balance").innerText = "Balance: "+data.balance
+  document.getElementById("profit").innerText = "Profit: "+(data.balance-data.start)
+  document.getElementById("stats").innerText = "Wins: "+data.wins+" | Loss: "+data.loss
+  document.getElementById("winrate").innerText = "WinRate: "+wr+"%"
+}
+
+function trade(type){
+  let e = entry()
+
+  if(type=="W"){
+    data.balance += e*0.8
+    data.wins++
+    data.step=0
+  } else {
+    data.balance -= e
+    data.loss++
+    data.step++
+  }
+
+  save()
+  update()
+}
+
+function reset(){
+  data = {balance:1500,start:1500,wins:0,loss:0,step:0}
+  save()
+  update()
+}
+
+update()
+
+</script>
+
+</body>
+</html>
