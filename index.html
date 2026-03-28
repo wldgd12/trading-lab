@@ -4,192 +4,204 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
 <style>
-body{background:#0b1220;color:white;font-family:Arial;text-align:center}
-.card{background:#111827;margin:12px;padding:18px;border-radius:16px}
-button{padding:12px;margin:6px;border:none;border-radius:10px;font-size:14px}
-.win{background:#22c55e}
-.loss{background:#ef4444}
-.settings{background:#3b82f6}
-.reset{background:#374151}
-.green{color:#22c55e}
-.red{color:#ef4444}
-td{padding:6px;border-bottom:1px solid #222;font-size:12px}
+body{margin:0;font-family:Arial;background:#0c111b;color:white}
+.container{display:flex;height:100vh}
+
+/* LEFT */
+.left{
+width:60%;
+background:#1f2937;
+padding:10px;
+overflow:auto;
+}
+
+table{width:100%;border-collapse:collapse}
+th,td{padding:8px;border-bottom:1px solid #333;text-align:center;font-size:13px}
+
+.win{background:#22c55e;color:black}
+.loss{background:#ef4444;color:white}
+
+/* RIGHT */
+.right{
+width:40%;
+background:#111827;
+padding:10px;
+}
+
+.box{
+background:#16a34a;
+color:black;
+padding:10px;
+border-radius:10px;
+margin-bottom:10px;
+}
+
+.box.dark{
+background:#020617;
+color:white;
+}
+
+button{
+padding:10px;
+margin:5px;
+border:none;
+border-radius:8px;
+font-weight:bold;
+}
+
+.winBtn{background:#22c55e}
+.lossBtn{background:#ef4444}
+.resetBtn{background:#374151;color:white}
+
 </style>
 </head>
 
 <body>
 
-<h2>🚀 Trading Lab AUTO PRO</h2>
+<div class="container">
 
-<div class="card">
-<p id="balance"></p>
-<p id="profit"></p>
-<p id="stats"></p>
+<!-- LEFT TABLE -->
+<div class="left">
+<table id="log">
+<tr>
+<th>#</th>
+<th>R</th>
+<th>Entry</th>
+<th>P/L</th>
+<th>Balance</th>
+</tr>
+</table>
+</div>
+
+<!-- RIGHT PANEL -->
+<div class="right">
+
+<div class="box">
+<p id="capital"></p>
+<p id="trades"></p>
+<p id="wr"></p>
+<p id="payout"></p>
+</div>
+
+<div class="box dark">
+<p id="final"></p>
+<p id="gain"></p>
+<p id="winProfit"></p>
+<p id="stop"></p>
+<p id="maxLoss"></p>
+</div>
+
+<div class="box dark">
 <p id="next"></p>
 <p id="status"></p>
 </div>
 
-<button class="win" onclick="trade('W')">WIN</button>
-<button class="loss" onclick="trade('L')">LOSS</button>
-<button class="settings" onclick="settings()">⚙️</button>
-<button class="reset" onclick="reset()">RESET</button>
+<button class="winBtn" onclick="trade('W')">WIN</button>
+<button class="lossBtn" onclick="trade('L')">LOSS</button>
+<button class="resetBtn" onclick="reset()">RESET</button>
 
-<div class="card">
-<table id="log"></table>
+</div>
+
 </div>
 
 <script>
 
-// ===== DATA =====
-let data = JSON.parse(localStorage.getItem("auto_pro_v2")) || {
-  balance:1500,
-  start:1500,
-  initialStart:1500, // 🔥 ثابت
-  wins:0,
-  loss:0,
-  step:0,
-  payout:0.8,
-  compoundRate:0.02,
-  trades:[],
-
-  maxEntry:100,
-  stopLoss:-50,
-  target:100,
-  maxStreak:3
+let data = JSON.parse(localStorage.getItem("pro_full")) || {
+balance:1500,
+start:1500,
+initialStart:1500,
+wins:0,
+loss:0,
+step:0,
+payout:0.92,
+trades:[],
+stopLoss:-50,
+target:100
 }
 
-// ===== ENTRY =====
+// ENTRY
 function entry(){
-  return data.step==0?12:data.step==1?18:24
+return data.step==0?12:data.step==1?18:24
 }
 
-// ===== SAVE =====
+// SAVE
 function save(){
-  localStorage.setItem("auto_pro_v2",JSON.stringify(data))
+localStorage.setItem("pro_full",JSON.stringify(data))
 }
 
-// ===== STREAK =====
-function losingStreak(){
-let s=0
-for(let i=data.trades.length-1;i>=0;i--){
-if(data.trades[i].r=="L") s++
-else break
-}
-return s
-}
-
-// ===== UPDATE =====
+// UPDATE
 function update(){
 
 let total=data.wins+data.loss
-let pnl=data.balance-data.initialStart // 🔥 FIX
+let wr=total>0?((data.wins/total)*100).toFixed(1):0
+let pnl=data.balance-data.initialStart
 
-document.getElementById("balance").innerText="💰 "+data.balance.toFixed(2)
+document.getElementById("capital").innerText="Capital: "+data.initialStart
+document.getElementById("trades").innerText="Trades: "+total
+document.getElementById("wr").innerText="WinRate: "+wr+"%"
+document.getElementById("payout").innerText="Payout: "+(data.payout*100)+"%"
 
-document.getElementById("profit").innerHTML=
-"📈 <span class='"+(pnl>=0?"green":"red")+"'>"+pnl.toFixed(2)+"</span>"
+document.getElementById("final").innerText="Capital Final: "+data.balance.toFixed(2)
+document.getElementById("gain").innerText="Account Gain: "+((pnl/data.initialStart)*100).toFixed(2)+"%"
+document.getElementById("winProfit").innerText="Profit: "+pnl.toFixed(2)
+document.getElementById("stop").innerText="Stop Loss: "+data.stopLoss
+document.getElementById("maxLoss").innerText="Max Loss Limit: 3"
 
-document.getElementById("stats").innerText=
-"Trades: "+total+" | Win: "+data.wins+" | Loss: "+data.loss
+document.getElementById("next").innerText="Next Entry: "+entry()
 
-document.getElementById("next").innerText=
-"Next Entry: "+entry()+"$"
+let status="GO"
+if(pnl<=data.stopLoss) status="STOP"
+if(pnl>=data.target) status="TARGET"
 
-let status="GO ✅"
+document.getElementById("status").innerText="Status: "+status
 
-if(pnl<=data.stopLoss) status="STOP LOSS 🚫"
-if(pnl>=data.target) status="TARGET 🎯"
-if(losingStreak()>=data.maxStreak) status="STREAK STOP ⚠️"
-
-document.getElementById("status").innerText=status
-
-// ===== LOG =====
+// TABLE
 let log=document.getElementById("log")
-log.innerHTML="<tr><td>#</td><td>R</td><td>$</td><td>P</td></tr>"
+log.innerHTML=`
+<tr><th>#</th><th>R</th><th>Entry</th><th>P/L</th><th>Balance</th></tr>`
 
-data.trades.slice(-10).forEach((t,i)=>{
-log.innerHTML+=
-"<tr><td>"+(i+1)+"</td><td>"+t.r+"</td><td>"+t.e+"</td><td>"+t.p.toFixed(2)+"</td></tr>"
+data.trades.forEach((t,i)=>{
+log.innerHTML+=`
+<tr>
+<td>${i+1}</td>
+<td class="${t.r=='W'?'win':'loss'}">${t.r}</td>
+<td>${t.e}</td>
+<td>${t.p.toFixed(2)}</td>
+<td>${t.b.toFixed(2)}</td>
+</tr>`
 })
 
 }
 
-// ===== BLOCK =====
-function blocked(){
-let pnl=data.balance-data.initialStart
-return (
-pnl<=data.stopLoss ||
-pnl>=data.target ||
-losingStreak()>=data.maxStreak
-)
-}
-
-// ===== TRADE =====
+// TRADE
 function trade(type){
-
-if(blocked()){
-alert("🚫 التداول موقوف")
-return
-}
 
 let e=entry()
 let p=0
 
 if(type=="W"){
 p=e*data.payout
-data.balance=Number((data.balance+p).toFixed(2))
+data.balance+=p
 data.wins++
 data.step=0
-
-// 🔥 COMPOUND صحيح
-data.start = Number((data.start + (data.start * data.compoundRate)).toFixed(2))
-
 }else{
 p=-e
-data.balance=Number((data.balance-e).toFixed(2))
+data.balance-=e
 data.loss++
 data.step++
 }
 
-if(entry()>data.maxEntry){
-data.step=0
-}
-
-data.trades.push({r:type,e:e,p:p})
+data.trades.push({
+r:type,e:e,p:p,b:data.balance
+})
 
 save()
 update()
 }
 
-// ===== SETTINGS =====
-function settings(){
-
-let b=prompt("رأس المال",data.balance)
-let p=prompt("نسبة الربح",data.payout)
-let c=prompt("نسبة النمو (0.02)",data.compoundRate)
-let m=prompt("أقصى دخول",data.maxEntry)
-let s=prompt("وقف الخسارة",data.stopLoss)
-let t=prompt("الهدف",data.target)
-
-if(b){
-data.balance=Number(b)
-data.start=Number(b)
-data.initialStart=Number(b) // 🔥 مهم
-}
-
-if(p){data.payout=Number(p)}
-if(c){data.compoundRate=Number(c)}
-if(m){data.maxEntry=Number(m)}
-if(s){data.stopLoss=Number(s)}
-if(t){data.target=Number(t)}
-
-save()
-update()
-}
-
-// ===== RESET =====
+// RESET
 function reset(){
-localStorage.removeItem("auto_pro_v2")
+localStorage.removeItem("pro_full")
 location.reload()
 }
 
