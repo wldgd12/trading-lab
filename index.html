@@ -5,15 +5,15 @@
 
 <style>
 body{background:#0b1220;color:white;font-family:Arial;text-align:center}
-.card{background:#111827;margin:12px;padding:16px;border-radius:14px}
-button{padding:12px;margin:5px;border:none;border-radius:10px}
+.card{background:#111827;margin:12px;padding:18px;border-radius:16px}
+button{padding:12px;margin:6px;border:none;border-radius:10px;font-size:14px}
 .win{background:#22c55e}
 .loss{background:#ef4444}
 .settings{background:#3b82f6}
 .reset{background:#374151}
 .green{color:#22c55e}
 .red{color:#ef4444}
-td{font-size:12px;padding:5px;border-bottom:1px solid #222}
+td{padding:6px;border-bottom:1px solid #222;font-size:12px}
 </style>
 </head>
 
@@ -41,15 +41,16 @@ td{font-size:12px;padding:5px;border-bottom:1px solid #222}
 <script>
 
 // ===== DATA =====
-let data = JSON.parse(localStorage.getItem("auto_pro")) || {
+let data = JSON.parse(localStorage.getItem("auto_pro_v2")) || {
   balance:1500,
   start:1500,
+  initialStart:1500, // 🔥 ثابت
   wins:0,
   loss:0,
   step:0,
   payout:0.8,
+  compoundRate:0.02,
   trades:[],
-  compoundRate:0.02, // 🔥 نسبة الزيادة
 
   maxEntry:100,
   stopLoss:-50,
@@ -64,7 +65,7 @@ function entry(){
 
 // ===== SAVE =====
 function save(){
-  localStorage.setItem("auto_pro",JSON.stringify(data))
+  localStorage.setItem("auto_pro_v2",JSON.stringify(data))
 }
 
 // ===== STREAK =====
@@ -81,7 +82,7 @@ return s
 function update(){
 
 let total=data.wins+data.loss
-let pnl=data.balance-data.start
+let pnl=data.balance-data.initialStart // 🔥 FIX
 
 document.getElementById("balance").innerText="💰 "+data.balance.toFixed(2)
 
@@ -102,7 +103,7 @@ if(losingStreak()>=data.maxStreak) status="STREAK STOP ⚠️"
 
 document.getElementById("status").innerText=status
 
-// LOG
+// ===== LOG =====
 let log=document.getElementById("log")
 log.innerHTML="<tr><td>#</td><td>R</td><td>$</td><td>P</td></tr>"
 
@@ -115,7 +116,7 @@ log.innerHTML+=
 
 // ===== BLOCK =====
 function blocked(){
-let pnl=data.balance-data.start
+let pnl=data.balance-data.initialStart
 return (
 pnl<=data.stopLoss ||
 pnl>=data.target ||
@@ -140,7 +141,7 @@ data.balance=Number((data.balance+p).toFixed(2))
 data.wins++
 data.step=0
 
-// 🔥 زيادة رأس المال
+// 🔥 COMPOUND صحيح
 data.start = Number((data.start + (data.start * data.compoundRate)).toFixed(2))
 
 }else{
@@ -165,12 +166,17 @@ function settings(){
 
 let b=prompt("رأس المال",data.balance)
 let p=prompt("نسبة الربح",data.payout)
-let c=prompt("نسبة زيادة رأس المال (0.02)",data.compoundRate)
+let c=prompt("نسبة النمو (0.02)",data.compoundRate)
 let m=prompt("أقصى دخول",data.maxEntry)
 let s=prompt("وقف الخسارة",data.stopLoss)
 let t=prompt("الهدف",data.target)
 
-if(b){data.balance=Number(b);data.start=Number(b)}
+if(b){
+data.balance=Number(b)
+data.start=Number(b)
+data.initialStart=Number(b) // 🔥 مهم
+}
+
 if(p){data.payout=Number(p)}
 if(c){data.compoundRate=Number(c)}
 if(m){data.maxEntry=Number(m)}
@@ -183,7 +189,7 @@ update()
 
 // ===== RESET =====
 function reset(){
-localStorage.removeItem("auto_pro")
+localStorage.removeItem("auto_pro_v2")
 location.reload()
 }
 
