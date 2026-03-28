@@ -16,7 +16,6 @@ th,td{padding:8px;border-bottom:1px solid #333;text-align:center;font-size:13px}
 
 /* RIGHT */
 .right{width:40%;background:#111827;padding:10px}
-
 .box{background:#16a34a;color:black;padding:10px;border-radius:10px;margin-bottom:10px}
 .dark{background:#020617;color:white}
 
@@ -25,7 +24,6 @@ button{padding:10px;margin:5px;border:none;border-radius:8px;font-weight:bold}
 .lossBtn{background:#ef4444}
 .resetBtn{background:#374151;color:white}
 .settingsBtn{background:#3b82f6;color:white}
-
 </style>
 </head>
 
@@ -33,14 +31,12 @@ button{padding:10px;margin:5px;border:none;border-radius:8px;font-weight:bold}
 
 <div class="container">
 
-<!-- TABLE -->
 <div class="left">
 <table id="log">
 <tr><th>#</th><th>R</th><th>Entry</th><th>P/L</th><th>Balance</th></tr>
 </table>
 </div>
 
-<!-- PANEL -->
 <div class="right">
 
 <div class="box">
@@ -69,13 +65,12 @@ button{padding:10px;margin:5px;border:none;border-radius:8px;font-weight:bold}
 <button class="resetBtn" onclick="reset()">RESET</button>
 
 </div>
-
 </div>
 
 <script>
 
 // ===== DATA =====
-let data = JSON.parse(localStorage.getItem("vip_final")) || {
+let data = JSON.parse(localStorage.getItem("ultimate")) || {
 balance:1500,
 start:1500,
 initialStart:1500,
@@ -91,32 +86,48 @@ trades:[],
 // SESSION
 sessionStart: Date.now(),
 sessionTrades: 0,
-sessionProfit: 0
+sessionProfit: 0,
+
+// SMART RISK
+riskPercent:2,
+autoRisk:true,
+minRisk:1,
+maxRisk:5
 }
 
 // ===== ENTRY =====
 function entry(){
-return data.step==0?12:data.step==1?18:24
+let base = data.balance * (data.riskPercent / 100)
+if(data.step==0) return Number(base.toFixed(2))
+if(data.step==1) return Number((base * 1.5).toFixed(2))
+return Number((base * 2).toFixed(2))
 }
 
-// ===== SMART GROWTH =====
-function getCompoundRate(){
-  if(data.balance < 1000) return 0.03
-  if(data.balance < 2000) return 0.02
-  return 0.01
+// ===== SMART RISK =====
+function updateRisk(){
+let last = data.trades.slice(-3)
+let wins = last.filter(t=>t.r=="W").length
+let losses = last.filter(t=>t.r=="L").length
+
+if(wins >= 2){
+data.riskPercent = Math.min(data.riskPercent + 0.5, data.maxRisk)
+}
+if(losses >= 2){
+data.riskPercent = Math.max(data.riskPercent - 0.5, data.minRisk)
+}
 }
 
-// ===== TIME FORMAT =====
+// ===== TIME =====
 function formatTime(ms){
-  let t=Math.floor(ms/1000)
-  let m=Math.floor(t/60)
-  let s=t%60
-  return m+":"+(s<10?"0":"")+s
+let t=Math.floor(ms/1000)
+let m=Math.floor(t/60)
+let s=t%60
+return m+":"+(s<10?"0":"")+s
 }
 
 // ===== SAVE =====
 function save(){
-localStorage.setItem("vip_final",JSON.stringify(data))
+localStorage.setItem("ultimate",JSON.stringify(data))
 }
 
 // ===== STREAK =====
@@ -142,11 +153,9 @@ let total=data.wins+data.loss
 let wr=total>0?((data.wins/total)*100).toFixed(1):0
 let pnl=data.balance-data.initialStart
 
-// SESSION
 let time=formatTime(Date.now()-data.sessionStart)
-let sp=data.sessionProfit
+let rate=data.riskPercent
 
-// UI
 document.getElementById("capital").innerText="Capital: "+data.initialStart
 document.getElementById("trades").innerText="Trades: "+total
 document.getElementById("wr").innerText="WinRate: "+wr+"%"
@@ -160,8 +169,6 @@ document.getElementById("limit").innerText="Max Loss: "+data.maxLoss
 
 document.getElementById("next").innerText="Next Entry: "+entry()
 
-let rate=getCompoundRate()
-
 let status="GO"
 if(pnl<=data.stopLoss) status="STOP LOSS"
 if(pnl>=data.target) status="TARGET"
@@ -170,8 +177,8 @@ if(streak()>=data.maxLoss) status="STREAK STOP"
 document.getElementById("status").innerText=
 "Status: "+status+
 " | ⏱ "+time+
-" | Session: "+sp.toFixed(2)+
-" | Growth: "+(rate*100)+"%"
+" | Session: "+data.sessionProfit.toFixed(2)+
+" | Risk: "+rate.toFixed(1)+"%"
 
 // TABLE
 let log=document.getElementById("log")
@@ -206,11 +213,6 @@ p=e*data.payout
 data.balance=Number((data.balance+p).toFixed(2))
 data.wins++
 data.step=0
-
-// SMART COMPOUND
-let rate=getCompoundRate()
-data.start=Number((data.start+(data.start*rate)).toFixed(2))
-
 }else{
 p=-e
 data.balance=Number((data.balance-e).toFixed(2))
@@ -224,6 +226,11 @@ data.sessionProfit=Number((data.sessionProfit+p).toFixed(2))
 
 data.trades.push({r:type,e:e,p:p,b:data.balance})
 
+// SMART APPLY
+if(data.autoRisk){
+updateRisk()
+}
+
 save()
 update()
 }
@@ -233,9 +240,10 @@ function settings(){
 
 let b=prompt("Capital",data.balance)
 let p=prompt("Payout (0.92)",data.payout)
-let t=prompt("Target",data.target)
-let s=prompt("Stop Loss",data.stopLoss)
-let m=prompt("Max Losing Streak",data.maxLoss)
+let r=prompt("Risk %",data.riskPercent)
+let auto=confirm("Auto Risk? OK = YES")
+let min=prompt("Min Risk",data.minRisk)
+let max=prompt("Max Risk",data.maxRisk)
 
 if(b){
 data.balance=Number(b)
@@ -247,9 +255,10 @@ data.sessionProfit=0
 }
 
 if(p){data.payout=Number(p)}
-if(t){data.target=Number(t)}
-if(s){data.stopLoss=Number(s)}
-if(m){data.maxLoss=Number(m)}
+if(r){data.riskPercent=Number(r)}
+data.autoRisk=auto
+if(min){data.minRisk=Number(min)}
+if(max){data.maxRisk=Number(max)}
 
 save()
 update()
@@ -257,13 +266,11 @@ update()
 
 // ===== RESET =====
 function reset(){
-localStorage.removeItem("vip_final")
+localStorage.removeItem("ultimate")
 location.reload()
 }
 
-// LIVE UPDATE
 setInterval(update,1000)
-
 update()
 
 </script>
