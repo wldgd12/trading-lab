@@ -74,7 +74,8 @@ button{padding:10px;margin:5px;border:none;border-radius:8px;font-weight:bold}
 
 <script>
 
-let data = JSON.parse(localStorage.getItem("vip")) || {
+// ===== DATA =====
+let data = JSON.parse(localStorage.getItem("vip_final")) || {
 balance:1500,
 start:1500,
 initialStart:1500,
@@ -85,17 +86,40 @@ payout:0.92,
 target:100,
 stopLoss:-50,
 maxLoss:3,
-trades:[]
+trades:[],
+
+// SESSION
+sessionStart: Date.now(),
+sessionTrades: 0,
+sessionProfit: 0
 }
 
+// ===== ENTRY =====
 function entry(){
 return data.step==0?12:data.step==1?18:24
 }
 
-function save(){
-localStorage.setItem("vip",JSON.stringify(data))
+// ===== SMART GROWTH =====
+function getCompoundRate(){
+  if(data.balance < 1000) return 0.03
+  if(data.balance < 2000) return 0.02
+  return 0.01
 }
 
+// ===== TIME FORMAT =====
+function formatTime(ms){
+  let t=Math.floor(ms/1000)
+  let m=Math.floor(t/60)
+  let s=t%60
+  return m+":"+(s<10?"0":"")+s
+}
+
+// ===== SAVE =====
+function save(){
+localStorage.setItem("vip_final",JSON.stringify(data))
+}
+
+// ===== STREAK =====
 function streak(){
 let s=0
 for(let i=data.trades.length-1;i>=0;i--){
@@ -105,17 +129,24 @@ else break
 return s
 }
 
+// ===== BLOCK =====
 function blocked(){
 let pnl=data.balance-data.initialStart
 return pnl<=data.stopLoss || pnl>=data.target || streak()>=data.maxLoss
 }
 
+// ===== UPDATE =====
 function update(){
 
 let total=data.wins+data.loss
 let wr=total>0?((data.wins/total)*100).toFixed(1):0
 let pnl=data.balance-data.initialStart
 
+// SESSION
+let time=formatTime(Date.now()-data.sessionStart)
+let sp=data.sessionProfit
+
+// UI
 document.getElementById("capital").innerText="Capital: "+data.initialStart
 document.getElementById("trades").innerText="Trades: "+total
 document.getElementById("wr").innerText="WinRate: "+wr+"%"
@@ -129,18 +160,24 @@ document.getElementById("limit").innerText="Max Loss: "+data.maxLoss
 
 document.getElementById("next").innerText="Next Entry: "+entry()
 
+let rate=getCompoundRate()
+
 let status="GO"
 if(pnl<=data.stopLoss) status="STOP LOSS"
-if(pnl>=data.target) status="TARGET HIT"
+if(pnl>=data.target) status="TARGET"
 if(streak()>=data.maxLoss) status="STREAK STOP"
 
-document.getElementById("status").innerText="Status: "+status
+document.getElementById("status").innerText=
+"Status: "+status+
+" | ⏱ "+time+
+" | Session: "+sp.toFixed(2)+
+" | Growth: "+(rate*100)+"%"
 
 // TABLE
 let log=document.getElementById("log")
 log.innerHTML=`<tr><th>#</th><th>R</th><th>Entry</th><th>P/L</th><th>Balance</th></tr>`
 
-data.trades.forEach((t,i)=>{
+data.trades.slice(-50).forEach((t,i)=>{
 log.innerHTML+=`
 <tr>
 <td>${i+1}</td>
@@ -153,6 +190,7 @@ log.innerHTML+=`
 
 }
 
+// ===== TRADE =====
 function trade(type){
 
 if(blocked()){
@@ -165,15 +203,24 @@ let p=0
 
 if(type=="W"){
 p=e*data.payout
-data.balance+=p
+data.balance=Number((data.balance+p).toFixed(2))
 data.wins++
 data.step=0
+
+// SMART COMPOUND
+let rate=getCompoundRate()
+data.start=Number((data.start+(data.start*rate)).toFixed(2))
+
 }else{
 p=-e
-data.balance-=e
+data.balance=Number((data.balance-e).toFixed(2))
 data.loss++
 data.step++
 }
+
+// SESSION
+data.sessionTrades++
+data.sessionProfit=Number((data.sessionProfit+p).toFixed(2))
 
 data.trades.push({r:type,e:e,p:p,b:data.balance})
 
@@ -181,11 +228,12 @@ save()
 update()
 }
 
+// ===== SETTINGS =====
 function settings(){
 
 let b=prompt("Capital",data.balance)
 let p=prompt("Payout (0.92)",data.payout)
-let t=prompt("Target Profit",data.target)
+let t=prompt("Target",data.target)
 let s=prompt("Stop Loss",data.stopLoss)
 let m=prompt("Max Losing Streak",data.maxLoss)
 
@@ -193,7 +241,11 @@ if(b){
 data.balance=Number(b)
 data.start=Number(b)
 data.initialStart=Number(b)
+data.sessionStart=Date.now()
+data.sessionTrades=0
+data.sessionProfit=0
 }
+
 if(p){data.payout=Number(p)}
 if(t){data.target=Number(t)}
 if(s){data.stopLoss=Number(s)}
@@ -203,10 +255,14 @@ save()
 update()
 }
 
+// ===== RESET =====
 function reset(){
-localStorage.removeItem("vip")
+localStorage.removeItem("vip_final")
 location.reload()
 }
+
+// LIVE UPDATE
+setInterval(update,1000)
 
 update()
 
